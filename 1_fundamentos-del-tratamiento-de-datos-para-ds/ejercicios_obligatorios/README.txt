@@ -1,4 +1,6 @@
-## Enunciado ejercicio 1
+
+
+# Enunciado ejercicio 1
 
 Dado un archivo que contiene en cada línea una palabra o conjunto de palabras seguido de un valor numérico, denominado “sentimiento”, y un conjunto de tweets, se pide calcular para cada tweet un valor denominado “sentimiento del tweet”, que se obtiene como la suma de los “sentimientos” de los términos que aparecen en el tweet.
 
@@ -39,3 +41,15 @@ Como resultado, se debe mostrar por pantalla un valor numérico en cada línea q
 
 No todos los tweets que se van a considerar tienen contenido, por lo que hay que filtrar aquellos que tienen de los que no tienen.
 
+# Enunciado ejercicio 2
+
+Dado un archivo que contiene en cada línea una palabra o conjunto de palabras seguido de un valor numérico denominado “sentimiento” y un conjunto de tweets, se pide calcular el sentimiento de aquellas palabras o conjunto de palabras que no tienen un valor asociado en el archivo de “sentimientos”. Se pueden seguir distintas estrategias para asignar un valor. Por ejemplo, se podría asignar como valor el valor del “sentimiento” del tweet en que se encuentra la palabra o conjunto de palabras sin valor, o el valor medio del “sentimiento” del tweet.
+
+## Condiciones
+
+- Como resultado se debe mostrar por pantalla en cada línea, una palabra o conjunto de palabras y a continuación un valor numérico que represente el “sentimiento” de dicha palabra o conjunto de palabras. Solo se mostrarán la palabra o conjunto de palabras que no aparecían con un valor en el archivo original.
+- No todos los tweets que se van a considerar tienen contenido, por lo que hay que filtrar aquellos que tienen de los que no tienen.
+- El programa tendrá 2 parámetros de entrada: el archivo que contiene los sentimientos de los términos y el archivo que contiene los tweets.
+
+## Resultado
+ Mostraremos las palabras y valores de aquellos tweets que tengan contenido.
