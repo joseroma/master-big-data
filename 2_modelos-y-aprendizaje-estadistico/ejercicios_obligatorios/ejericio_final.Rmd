@@ -1,0 +1,338 @@
+---
+title: Ejercicios obligatorios
+author: Jose Rodríguez Maldonado
+date: Octubre 5, 2020
+output:
+  rmdformats::material:
+    code_folding: hide
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: tango
+---
+
+# Enunciado
+
+Tomaremos el dataset de aprobación de crédito bancario en https://archive.ics.uci.edu/ml/datasets/Credit+Approval . 
+
+Los datos también se pueden cargar de la carpeta de contenido en  `crx.data`. 
+
+La información del dataset está en https://archive.ics.uci.edu/ml/machine-learning-databases/credit-screening/crx.names y expone lo siguiente:
+
+      1. Title: Credit Approval
+
+      2. Sources: 
+          (confidential)
+          Submitted by quinlan@cs.su.oz.au
+      
+      3.  Past Usage:
+      
+          See Quinlan,
+          * "Simplifying decision trees", Int J Man-Machine Studies 27,
+            Dec 1987, pp. 221-234.
+          * "C4.5: Programs for Machine Learning", Morgan Kaufmann, Oct 1992
+        
+      4.  Relevant Information:
+      
+          This file concerns credit card applications.  All attribute names
+          and values have been changed to meaningless symbols to protect
+          confidentiality of the data.
+        
+          This dataset is interesting because there is a good mix of
+          attributes -- continuous, nominal with small numbers of
+          values, and nominal with larger numbers of values.  There
+          are also a few missing values.
+        
+      5.  Number of Instances: 690
+      
+      6.  Number of Attributes: 15 + class attribute
+      
+      7.  Attribute Information:
+      
+          A1:	b, a.
+          A2:	continuous.
+          A3:	continuous.
+          A4:	u, y, l, t.
+          A5:	g, p, gg.
+          A6:	c, d, cc, i, j, k, m, r, q, w, x, e, aa, ff.
+          A7:	v, h, bb, j, n, z, dd, ff, o.
+          A8:	continuous.
+          A9:	t, f.
+          A10:	t, f.
+          A11:	continuous.
+          A12:	t, f.
+          A13:	g, p, s.
+          A14:	continuous.
+          A15:	continuous.
+          A16: +,-         (class attribute)
+      
+      8.  Missing Attribute Values:
+          37 cases (5%) have one or more missing values.  The missing
+          values from particular attributes are:
+      
+          A1:  12
+          A2:  12
+          A4:   6
+          A5:   6
+          A6:   9
+          A7:   9
+          A14: 13
+      
+      9.  Class Distribution
+        
+          +: 307 (44.5%)
+          -: 383 (55.5%)
+      
+
+
+# Ejercicio 1
+
+Carga los datos. Realiza una inspección por variables de la distribución de aprobación de crédito en función de cada atributo visualmente. Realiza las observaciones pertinentes. ¿ Qué variables son mejores para separar los datos?
+
+
+## Carga de datos
+
+```{r load_data, message=FALSE, warning=FALSE, paged.print=TRUE}
+library(readr)
+df <- read_csv("CASO_FINAL_crx.data", col_names = c("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13", "A14", "A15", "A16"), na='?')
+
+df$A11 <- ifelse(is.na(df$A11), NA, as.numeric(df$A11))
+df$A14 <- ifelse(is.na(df$A14), NA, as.numeric(df$A14))
+df$A15 <- ifelse(is.na(df$A15), NA, as.numeric(df$A15))
+
+head(df)
+```
+Revisamos rápidamente los datos que acabamos de cargar con la función skim `package - skimr`. Podremos ver:
+
+- Tipos de columnas
+- Valores vacíos
+- Distribución de datos
+
+
+```{r}
+library(skimr)
+skim(df)
+```
+
+
+## Estudio de la distribución
+
+A continuación vamos a mostrar para valores continuos unos gráficos de lineas y para variables categóricas gráficos de barras. En estas gráficas vemos enfrentadas las clases **+** y **-**, en color azul y salmon respectivamente.
+
+
+```{r first_graph, fig.height=50, fig.width=30, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(cowplot)
+
+
+my_plots <- lapply(setdiff(names(df), c("A16")), function(var_x){
+  p <- 
+    ggplot(df) +
+    aes_string(var_x)
+  
+  if(is.numeric(df[[var_x]]) && var_x != "A15") {
+    p <- ggplot(df, aes(x=df[[var_x]], fill=A16)) + xlab(var_x) + geom_density(alpha=.3) + theme(text = element_text(size=35))
+
+  } else if(var_x == "A15"){
+    p <- ggplot(df, aes(x=df[[var_x]], fill=A16)) + xlab(var_x) + geom_boxplot() + theme(text = element_text(size=35))
+  } 
+  
+  else {
+    
+    p <- ggplot(df, aes(x=df[[var_x]], fill=A16)) + xlab(var_x)  + geom_bar( alpha=.5, position="dodge") + theme(text = element_text(size=35))
+    #p <- p + geom_bar()
+  } 
+
+})
+
+plot_grid(plotlist = my_plots, ncol=2, align = "v", scale=1)
+```
+
+
+En base a las gráficas superiores podemos extraer bastante información.
+
+- Encontramos una clara bimodalidad en la distribución de datos continuos, esta bimodalidad nos indica que dentro de esta distribución de datos subyacen dos grupos heterogeneos que convendría estudiar por separado. De entre las variables continuas que estamos estudiando destaca el ejemplo de la variable **A3**, en el resto encontramos también bimodalidad pero en una forma mas leve. 
+
+- En lo referente a las variables categóricas tenemos tanto variables cuya proporción de las clases **+** y **-** son directamente proporcionales, como es el caso de **A1**. Por otro lado, encontramos variables como la **A9** o **A10** cuya relación es totalmente contraria, inversamente proporcional.
+
+- La distribución de datos entre las variables **+** y **-** difiere sobre todo para los valores mas pequeños, reforzando lo que se acaba de comentar sobre bimodalidad, se repite para la variables **A14**, **A11**, **A8** y levemente en el caso de **A2** y **A15**.
+
+
+
+
+
+
+
+# Ejercicio 2
+
+Prepara el dataset convenientemente e imputa los valores faltantes usando la librería `missForest`
+```{r lista_valores_vacios, message=FALSE, warning=FALSE}
+library(missForest)
+library(randomForest)
+library(visdat)
+library(PRROC)
+library(dplyr)
+library(ggplot2)
+
+
+# Data table to Data frame
+df <- as.data.frame(df)
+
+# Set seed
+set.seed(2020)
+  
+# Get cols with missing values
+character_cols <- sapply(df, class)
+col_character_names <- names(character_cols[character_cols=="character"])
+df[col_character_names] <- lapply(df[col_character_names] , factor)
+print("Variable types: ")
+print(sapply(df, class))
+  
+# Input data
+print("Data imputing ...")
+imp_df <- missForest(df, verbose = TRUE)
+imp_df <-imp_df$ximp 
+skim(imp_df)
+```
+
+# Ejercicio 3
+
+Divide el dataset tomando las primeras 590 instancias como train y las últimas 100 como test.
+```{r}
+imp_df <- imp_df %>% mutate(A16 = recode(A16, "-" = 0, "+" = 1))
+train_df <- imp_df %>% slice(0:590)
+test_df <- imp_df %>% slice(591:n())
+cat(c("El número de filas en train es de ", nrow(train_df)))
+cat(c("El número de filas en test es de ", nrow(test_df)))
+```
+
+
+# Ejercicio 4
+
+Entrena un modelo de regresión logística con regularización Ridge y Lasso en train seleccionando el que mejor **AUC** tenga. Da las métricas en test.
+
+Preparamos los datos para pasarlos por los modelos de regresión logística (Lasso y Ridge).
+
+```{r Dividing datasets, message=FALSE, warning=FALSE}
+library(pROC)
+library(mltools)
+library(glmnet)
+library(caret)
+library(doParallel)
+library(e1071)
+library(ROCR)
+library(pROC)
+
+# Nombres de features
+predictors <- names(train_df)[!names(train_df) %in% "A16"]
+
+# Dividimos los conjuntos de datos
+x_train = train_df[,predictors]
+y_train = train_df$A16
+x_test = test_df[,predictors]
+y_test = test_df$A16
+```
+
+Para entrenar los modelos de regresión logística vamos a utilizar la función `cv.glmnet()`, esta función realiza por defecto una validación cruzada de 10 k-folds. De esta forma dividimos nuestros datos diez veces (de forma no solapada) en un tamaño similar que utilizaremos para entrenar/validar. 
+
+En Lasso y Ridge, esta validación cruzada nos ayudará a seleccionar el mejor valor de lambda. Con la opción `lambda.min` haremos la predicción con el \(\lambda\)  que arroje el menor error medio en la validación cruzada.
+
+
+## Lasso
+
+En este primer chunk haremos una validación cruzada para diferentes \(\lambda\) y mostraremos un gráfico con sus resultados.
+
+```{r}
+# Para procesar en paralelo
+registerDoParallel(cores=4)
+# Entrenamos los modelos Cross Validation
+cvfit_lasso = cv.glmnet(data.matrix(x_train), as.matrix(y_train), family = "binomial", alpha = 1, parallel = TRUE, type.measure='auc')
+# Imprimimos el AUC para los diferentes alphas
+plot(cvfit_lasso)
+```
+
+De los \(\lambda\) mostrados anteriormente extraeremos los resultados para el \(\lambda\) que arroje el menor error.
+
+```{r}
+rocplot <- function(pred, truth, ...) {
+  predob = prediction(pred, truth)
+  perf = performance(predob, "tpr", "fpr")
+  plot(perf, ...)
+  roc <- roc(pred, truth, auc=TRUE)
+  area <- auc(roc)
+  area <- format(round(area, 4), nsmall = 4)
+  text(x=0.8, y=0.1, labels = paste("AUC =", area))
+
+  # the reference x=y line
+  segments(x0=0, y0=0, x1=1, y1=1, col="gray", lty=2)
+}
+# Extraemos las predicciones
+pred_lasso = predict(cvfit_lasso, newx = data.matrix(x_test), s = "lambda.min", type = "class")
+# Extraemos métricas generales
+confusionMatrix(as.factor(pred_lasso), as.factor(y_test), positive="1")
+# Extraemos AUC
+rocplot(as.numeric(pred_lasso), y_test,col="blue")
+```
+
+## Ridge
+
+Realizamos otra validación cruzada para diferentes \(\lambda\) y mostraremos un gráfico con sus resultados. Para pasar de Lasso a Ridge simplemente tendremos que cambiar el alpha.
+
+```{r}
+# Entrenamos los modelos Cross Validation
+cvfit_ridge = cv.glmnet(data.matrix(x_train), as.matrix(y_train), family = "binomial", alpha = 0, parallel=TRUE, standardize=TRUE)
+# Imprimimos el AUC para los diferentes alphas
+plot(cvfit_ridge)
+```
+
+De los \(\lambda\) mostrados anteriormente extraeremos los resultados para el \(\lambda\) que arroje el menor error.
+
+```{r}
+# Obtenemos la predicción
+pred_ridge = predict(cvfit_ridge, newx = data.matrix(x_test), s = "lambda.min", type = "class", type.measur='auc')
+# Extraemos métricas generales
+confusionMatrix(as.factor(pred_ridge), as.factor(y_test), positive="1")
+# Extraemos AUC
+rocplot(as.numeric(pred_ridge), y_test,col="blue")
+
+```
+
+## Resultados
+
+Como podemos ver, la diferencia en los resultados entre Lasso y Ridge es muy leve. Para el caso de Ridge, hemos obtenido un AUC de 0.8504 y para Lasso tenemos un AUC de 0.8667. 
+
+# Ejercicio 5
+
+Aporta los *log odds* de las variables predictoras sobre la variable objetivo.
+
+Recordamos que hemos sustituido el símbolo de **+** con el número 1. Empezamos estudiando el caso del modelo Lasso.
+
+```{r}
+as.matrix(coef(cvfit_lasso, s = cvfit_lasso$lambda.1se))
+```
+
+Seguimos con el caso de los *log odds* en el caso de Ridge.
+
+```{r}
+as.matrix(coef(cvfit_ridge, s = cvfit_ridge$lambda.1se))
+```
+
+
+# Ejercicio 6
+
+Si por cada verdadero positivo ganamos 100e y por cada falso positivo perdemos 20e. ¿Qué valor monetario generará el modelo teniendo en cuénta la matriz de confusión del modelo con mayor AUC (con las métricas en test)?
+
+Para el caso del modelo de Lasso 
+```{r}
+m_lasso <- confusionMatrix(as.factor(pred_lasso), as.factor(y_test), positive="1")
+m_lasso
+cat(c("Valor monetario que generará el modelo de Lasso es de: ", (m_lasso$table[[4]]*100)-(m_lasso$table[[2]]*20), "€"))
+```
+```{r}
+m_ridge <- confusionMatrix(as.factor(pred_ridge), as.factor(y_test), positive="1")
+m_ridge
+cat(c("Valor monetario que generará el modelo de Ridge es de: ", (m_ridge$table[[4]]*100)-(m_ridge$table[[2]]*20), "€"))
+```
+
+En estos términos podemos notar una diferencia mucho mas significativa entre los modelos estudiados.

@@ -1,0 +1,266 @@
+---
+title: Ejercicios obligatorios
+author: Jose Rodríguez Maldonado
+date: Octubre 5, 2020
+output:
+  rmdformats::material:
+    code_folding: hide
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: kate
+---
+
+```{r setup, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+opts_chunk$set(prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+```
+
+
+# Enunciado 1
+
+
+En el archivo auto.csv se encuentran los siguientes datos de diferentes automóviles:
+
+- Cilindros
+- Cilindrada
+- Potencia
+- Peso
+- Aceleración
+- Año del coche
+- Origen
+- Consumo (mpg)
+
+Las unidades de las características de los automóviles no se encuentran en el sistema internacional. La variable “origen” es un código que identifica al país de origen.
+
+Crea un modelo con él para que se pueda estimar el consumo de un vehículo a partir del resto de las variables.
+
+
+# Resolución
+
+## Lectura de datos
+
+Empezamos leyendo, y estudiando, el conjunto de datos proporcionado. 
+
+```{r}
+library(readr)
+library (Hmisc)
+library(corrplot)
+library(caret)
+library(plyr)
+library(GGally)
+library(skimr)
+library(ggplot2)
+library(cluster)
+library(dplyr)
+library(factoextra)
+library(NbClust)
+library(kableExtra)
+
+auto <- read_csv("datos/auto.csv")
+skim(auto)
+```
+
+Comprobamos que no tenemos valores perdidos. Como hemos dicho anteriormente, tenemos 8 variables, una dependiente **mpg** y las demás independientes, para un total de 392 observaciones, es decir, tipos de coche distintos.
+
+## Estudio preliminar de los datos
+
+Para saber la mejor forma de representar los datos revisaremos las métricas estadísticas básicas que nos ofrece, para cada columna, el comando **summary**.
+
+```{r}
+summary(auto)
+```
+
+Vemos que las variables están en rangos distintos por lo que si queremos realizar gráficos conjuntos, probablemente deberemos normalizar las muestras. Destacan las diferencias entre los mínimos y los máximos valores en ciertos casos, esto podría estar indicándonos la presencia de outliers.
+
+Para un proceso de regresión, el primer paso es intentar encontrar gráficamente relaciones entre las variables, que podremos seleccionar inicialmente en nuestro proceso. Empezamos estudiando la relación entre las diferentes variables. 
+
+```{r}
+ggpairs(auto)
+```
+
+Encontramos relacionadas directamente las variables
+  
+  - **horsepower**
+  - **weight**
+  - **cylinders**
+  - **displacement**
+  
+En cambio, encontramos relacionadas de forma inversamente proporcionar las variables **displacement**, **horsepower** o **weight** frente a **mpg**.  Es decir, el aumento de estas variables implica un mayor consumo, algo que a priori parece tener mucho sentido. A continuación vamos a graficar algunas de estas relaciones para extraer mas información. Para ello cambiaremos el año, el origen y los cilindros a factor.
+
+```{r}
+auto$origin<-as.factor(auto$origin)
+auto$cylinders<-as.factor(auto$cylinders)
+auto$model_year<-as.factor(auto$model_year)
+```
+
+## Analisis exploratorio de datos
+
+Estudiamos la distribución de la variable **cylinders**.
+
+```{r}
+ggplot(auto, aes(mpg,fill=cylinders))+geom_histogram(binwidth=1)
+```
+
+
+Vemos que los coches de *4 cilindros*, además de ser los más comunes, son los que **menos consumo** ofrecen. Los coches 6 y 8 cilindros, tienen un nivel de **mpg** por debajo de unos 25 y 20 respectiamente, consumen mucho.
+
+Vamos a ver también, el mismo gráfico en función del año y el origen.
+
+```{r}
+ggplot(auto, aes(mpg,fill=model_year))+geom_histogram(binwidth=1)
+```
+
+```{r}
+ggplot(auto, aes(mpg,fill=origin))+geom_histogram(binwidth=1)
+```
+
+
+Podemos ver como los años de los coches se distribuyen en igual medida, los mas modernos consumen menos y los mas antiguos mas.
+
+En lo referente al **origin**, vemos que el origen mayoritario es de tipo 1. Los coches de tipo 1 tienen tendencia a consumos mas altos si comparamos con los tipo 2 y 3.
+
+Si superpusieramos ambos gráficos podríamos comprobar como los coches más antiguos se solapan con el origen de tipo 1 y los más nuevos con los origenes 2 y 3.
+
+Por último vamos a pasar a obtener gráficos de las distribuciones de las variables, ya que es un dato interesante a la hora de hacer predicciones.
+
+```{r}
+par(mfrow = c(4, 2))
+hist(as.numeric(auto$cylinders), main = "Cylinders histogram",  xlab = "cylinders")
+hist(auto$displacement, main = "Displacement histogram",  xlab = "displacement")
+hist(auto$horsepower, main = "Horsepowe histogram",  xlab = "horsepower")
+hist(auto$weight, main = "Weight histogram",  xlab = "weight")
+hist(auto$acceleration, main = "Acceleration histogram",  xlab = "acceleration")
+hist(as.numeric(auto$model_year), main = "Model year histogram",  xlab = "model_year")
+hist(as.numeric(auto$origin), main = "Origin histogram",  xlab = "origin")
+hist(auto$mpg, main = "MPG histogram",  xlab = "mpg")
+```
+
+
+Vemos como **acceleration** y **mpg**, tienen distribuciones cerca de la normal. En cambio, **horsepower**, **displacement** y **weight** están desplazadas muy a la izquierda, esto era de esperar ya que habrá pocos coches con mucha potencia o con mucho peso.
+
+Por último realizaremos gráficos de cajas sobre el dataset y estudiar la presencia o no de posibles outliers. Primero normalizaremos los datos.
+
+
+```{r}
+normalizados <- preProcess(auto, method = "range")
+auto<-predict(normalizados, auto)
+boxplot(auto[,c( "displacement", "horsepower","weight","acceleration", "mpg")])
+```
+
+Vemos que están distribuidas homogeneamente. No obstante, encontramos algunos outliers en ambos extremos de las variables **aceleración** y **horsepower**.
+
+## Resumen del Análisis exploratorio
+
+El proceso de análisis exploratorio de datos, sobre el dataset auto, ha sido sencillo puesto que no presentaba valores perdidos ni ninguna necesidad especial de pre-procesado de datos, aparte de la normalización de los mismos.
+
+Por medio de gráficos, hemos obtenido información sobre la interación de las variables independientes con la dependiente. Esta información será muy útil de cara al proceso de regresión posterior.
+
+
+## Regresión
+
+Vamos a utilizar un algoritmo para crear regresión lineal múltiple. Empezando probando todas las variables de las que disponemos.
+
+```{r}
+fit<-lm(mpg~.,data=auto)
+summary(fit)
+```
+
+**¿Cómo podríamos mejorar los resultados de este modelo?**
+
+- Filtrando variables
+- Añadiendo transformaciones en los datos
+
+
+Podríamos quitar variables que no aporten información a nuestro modelo. En nuestro caso, podemos probar a quitar la variable **displacement** y **acceleration** que aportan poca información (p-valor muy alto), además la variable **displacement** está altamente correlacionada con **weight** y **horsepower**.
+
+
+```{r}
+fit2<-lm(mpg~cylinders+horsepower+weight+model_year+origin,data=auto)
+summary(fit2)
+```
+
+Si nos fijamos en el R-squared, hemos conseguido mantener buenos resultados reduciendo la complejidad de nuestro modelo reduciendo el número de variables. Como comentábamos anteriormente, resulta muy interesante transformar alguna de las variables para tratar de mejorar los resultados. Esto puede hacerse de una forma tan sencilla como elevar al cuadrado una varaible.
+
+```{r}
+fit3<-lm(mpg~cylinders+horsepower+weight+model_year+origin+I(horsepower^2)+I(weight^2),data=auto)
+summary(fit3)
+```
+
+# Ejercicio 3
+
+En el archivo `crime_data.csv` se encuentra el número de crímenes por cada 100.000 habitantes en cada uno de los estados de Estados Unidos, así como el porcentaje de la población que es urbana. Los crímenes se han agrupado en: asalto, asesinato y violación.
+
+Segmenta este conjunto de datos utilizando k-means y obtén los centroides de cada clúster y el listado de los estados en cada uno de los clústeres. Para ello, se ha de encontrar el número óptimo de clúster en el que se divide el conjunto de datos.
+
+# Resolución
+
+```{r}
+crime_data <- read_csv("datos/crime_data.csv")
+skim(crime_data)
+```
+
+Comprobamos que no tenemos valores perdidos. Como hemos dicho anteriormente, tenemos 5 variables independientes, para un total de 50 observaciones. 
+
+Empezamos escalando los datos.
+
+```{r}
+crime_data_ <- scale(crime_data %>% select("Murder", "Assault", "UrbanPop", "Rape"))
+crime_data_scaled <- data.frame(cbind(State = crime_data$State, crime_data_))
+head(crime_data_scaled,n=5)
+```
+
+El siguiente paso será extraer el número optimo de clusters para este conjunto de datos. Para ello vamos a utilizar un paquete que proporciona 30 índices para determinar el mejor número de clusters.
+
+```{r}
+set.seed(123)
+cluster_data <- crime_data %>% select("Murder", "Assault", "UrbanPop", "Rape")
+res.nbclust <- NbClust(cluster_data, distance = "euclidean",
+                  min.nc = 2, max.nc = 10, 
+                  method = "complete", index ="all") 
+```
+
+Como podemos ver, se nos recomienda usar 3 clusters, vamos a comprobar eso con el indice de Silhouette.
+
+```{r}
+fviz_nbclust(cluster_data, kmeans, method = c("silhouette")) + geom_vline(xintercept = 2, linetype=5, col= "darkred")+
+  labs(subtitle = "Silhouette method")
+```
+
+
+En vistas de los resultados obtenidos pasamos a clusterizar utilizando 3 grupos.
+
+```{r}
+km.res <- kmeans(cluster_data, 3, nstart = 25)
+fviz_cluster(list(data = cluster_data, cluster = km.res$cluster), frame.type = "convex")
+```
+
+Para este cluster, los centroides obtenidos han sido.
+
+```{r}
+kable(km.res$centers)%>%
+    kable_paper("hover", full_width = F)
+```
+
+Los estados que tenemos en cada clusters son los siguientes.
+
+```{r}
+df_list_of_states <- data.frame(cbind(State = crime_data$State, Cluster = km.res$cluster)) %>% 
+    group_by(Cluster) %>% 
+    mutate(list_of_states = paste0(State, collapse = ", ")) 
+
+kable(list_of_states <- df_list_of_states %>%
+    distinct(Cluster, .keep_all = TRUE) %>%
+    select(c(Cluster, list_of_states))%>%
+    arrange(Cluster))%>%
+    kable_paper("hover", full_width = F)
+```
+
+
